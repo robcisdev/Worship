@@ -244,8 +244,8 @@
                 return;
             }
             
-            // Advance to next slide (by 2 lines)
-            currentIndex += 2;
+            // Advance to next slide (by 1 line)
+            currentIndex++;
             
             // If we've reached the end, go back to start
             if (currentIndex >= lyrics.length) {
@@ -301,14 +301,12 @@
                 return;
             }
             
-            // Go to the previous slide (by 2 lines)
-            currentIndex -= 2;
+            // Go to the previous slide (by 1 line)
+            currentIndex--;
             
             // If we're before the first slide, loop to the end
             if (currentIndex < 0) {
-                // Find the last valid 2-line starting position
-                const totalSlides = Math.ceil(lyrics.length / 2);
-                currentIndex = (totalSlides - 1) * 2;
+                currentIndex = lyrics.length - 1;
             }
             
             updateLyricDisplay();
