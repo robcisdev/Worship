@@ -1,1 +1,244 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Worship Lyrics Slideshow</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE',
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-in-out',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .blur-text {
+            filter: blur(3px);
+            opacity: 0.7;
+        }
+        
+        .dark .app-container {
+            background-color: #181818;
+            color: white;
+        }
+        
+        .dark .input-container {
+            background-color: #222;
+        }
+        
+        .dark .slideshow-container {
+            background-color: #111;
+        }
+        
+        .transition-all {
+            transition: all 0.3s ease;
+        }
+    </style>
+</head>
+<body class="h-full m-0 font-sans bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+    <div class="app-container h-full flex flex-col">
+        <!-- Input view -->
+        <div id="inputView" class="flex flex-col h-full p-4">
+            <h1 class="text-2xl font-bold text-center mb-4 text-primary dark:text-primary">Worship Lyrics Slideshow</h1>
+            
+            <div class="input-container bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 flex-grow flex flex-col">
+                <label for="lyricsInput" class="block text-sm font-medium mb-2">Paste your lyrics below:</label>
+                <textarea 
+                    id="lyricsInput" 
+                    class="w-full flex-grow p-3 border rounded-md text-base dark:bg-gray-700 dark:border-gray-600 focus:border-primary focus:ring-primary"
+                    placeholder="Enter your lyrics here. Each line will be treated as a separate slide."></textarea>
+                
+                <div class="flex justify-center space-x-4 mt-4">
+                    <button 
+                        id="startButton" 
+                        class="bg-primary hover:bg-primary/90 text-white py-2 px-6 rounded-md text-base transition-all"
+                        >Start Slideshow</button>
+                    <button 
+                        id="clearButton" 
+                        class="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 py-2 px-6 rounded-md text-base transition-all"
+                        >Clear Lyrics</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Slideshow view -->
+        <div id="slideshowView" class="h-full flex flex-col hidden">
+            <div class="slideshow-container bg-black text-white flex-grow flex flex-col justify-center items-center relative" id="slideshowContainer">
+                <div class="absolute top-4 left-4">
+                    <button 
+                        id="exitButton" 
+                        class="bg-gray-800 hover:bg-gray-700 text-white py-1 px-3 rounded-md text-sm"
+                        >Exit</button>
+                </div>
+                
+                <div id="instructionText" class="text-center p-8 animate-fade-in">
+                    <p class="text-xl mb-4">Click anywhere to advance through the lyrics</p>
+                    <p class="text-gray-400">Current slide is shown in full, next slide is blurred</p>
+                </div>
+                
+                <div id="lyricsDisplay" class="text-center p-8 hidden">
+                    <!-- Current lyric -->
+                    <div id="currentLyric" class="text-4xl md:text-5xl lg:text-6xl font-bold mb-8 min-h-[4rem] animate-fade-in"></div>
+                    
+                    <!-- Next lyric (blurred) -->
+                    <div id="nextLyric" class="text-2xl md:text-3xl blur-text min-h-[3rem] animate-fade-in"></div>
+                </div>
+                
+                <div class="absolute bottom-4 w-full flex justify-between px-6">
+                    <div id="slideInfo" class="text-gray-400"></div>
+                    <div class="text-gray-400">Tap/click to advance</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize dark mode based on user preference
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+        
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+        
+        // Get DOM elements
+        const inputView = document.getElementById('inputView');
+        const slideshowView = document.getElementById('slideshowView');
+        const lyricsInput = document.getElementById('lyricsInput');
+        const startButton = document.getElementById('startButton');
+        const clearButton = document.getElementById('clearButton');
+        const exitButton = document.getElementById('exitButton');
+        const slideshowContainer = document.getElementById('slideshowContainer');
+        const instructionText = document.getElementById('instructionText');
+        const lyricsDisplay = document.getElementById('lyricsDisplay');
+        const currentLyric = document.getElementById('currentLyric');
+        const nextLyric = document.getElementById('nextLyric');
+        const slideInfo = document.getElementById('slideInfo');
+        
+        let lyrics = [];
+        let currentIndex = 0;
+        
+        // Event Listeners
+        startButton.addEventListener('click', startSlideshow);
+        clearButton.addEventListener('click', clearLyrics);
+        exitButton.addEventListener('click', exitSlideshow);
+        slideshowContainer.addEventListener('click', advanceSlide);
+        
+        // Try to load saved lyrics from localStorage if available
+        try {
+            const savedLyrics = localStorage.getItem('worshipLyrics');
+            if (savedLyrics) {
+                lyricsInput.value = savedLyrics;
+            }
+        } catch (e) {
+            console.log('LocalStorage not available:', e);
+        }
+        
+        function startSlideshow() {
+            const text = lyricsInput.value.trim();
+            if (!text) {
+                alert('Please enter some lyrics first.');
+                return;
+            }
+            
+            // Try to save lyrics to localStorage
+            try {
+                localStorage.setItem('worshipLyrics', text);
+            } catch (e) {
+                console.log('Could not save to localStorage:', e);
+            }
+            
+            // Split into lines and remove empty lines
+            lyrics = text.split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0);
+            
+            if (lyrics.length === 0) {
+                alert('Please enter valid lyrics with at least one line.');
+                return;
+            }
+            
+            // Switch to slideshow view
+            inputView.classList.add('hidden');
+            slideshowView.classList.remove('hidden');
+            
+            // Reset and start slideshow
+            currentIndex = 0;
+            instructionText.classList.remove('hidden');
+            lyricsDisplay.classList.add('hidden');
+        }
+        
+        function advanceSlide() {
+            // If first click, hide instructions and show lyrics
+            if (!instructionText.classList.contains('hidden')) {
+                instructionText.classList.add('hidden');
+                lyricsDisplay.classList.remove('hidden');
+                updateLyricDisplay();
+                return;
+            }
+            
+            // Advance to next slide
+            currentIndex++;
+            
+            // If we've reached the end, go back to start
+            if (currentIndex >= lyrics.length) {
+                currentIndex = 0;
+            }
+            
+            updateLyricDisplay();
+        }
+        
+        function updateLyricDisplay() {
+            // Display current lyric
+            currentLyric.textContent = lyrics[currentIndex];
+            
+            // Display next lyric (if available)
+            if (currentIndex + 1 < lyrics.length) {
+                nextLyric.textContent = lyrics[currentIndex + 1];
+                nextLyric.classList.remove('hidden');
+            } else {
+                // If at the last lyric, show the first one as next or clear
+                nextLyric.textContent = lyrics[0];
+            }
+            
+            // Update slide information
+            slideInfo.textContent = `Slide ${currentIndex + 1} of ${lyrics.length}`;
+        }
+        
+        function clearLyrics() {
+            lyricsInput.value = '';
+            try {
+                localStorage.removeItem('worshipLyrics');
+            } catch (e) {
+                console.log('Could not clear localStorage:', e);
+            }
+        }
+        
+        function exitSlideshow() {
+            slideshowView.classList.add('hidden');
+            inputView.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
 
