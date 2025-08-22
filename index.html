@@ -28,8 +28,8 @@
     </script>
     <style>
         .blur-text {
-            filter: blur(3px);
-            opacity: 0.7;
+            filter: blur(1px);
+            opacity: 0.8;
         }
         
         .dark .app-container {
@@ -63,15 +63,24 @@
                     class="w-full flex-grow p-3 border rounded-md text-base dark:bg-gray-700 dark:border-gray-600 focus:border-primary focus:ring-primary"
                     placeholder="Enter your lyrics here. Each line will be treated as a separate slide."></textarea>
                 
-                <div class="flex justify-center space-x-4 mt-4">
+                <div class="flex flex-wrap justify-center gap-4 mt-4">
                     <button 
                         id="startButton" 
                         class="bg-primary hover:bg-primary/90 text-white py-2 px-6 rounded-md text-base transition-all"
                         >Start Slideshow</button>
                     <button 
+                        id="saveButton" 
+                        class="bg-green-600 hover:bg-green-700 text-white py-2 px-6 rounded-md text-base transition-all"
+                        >Save to File</button>
+                    <button 
+                        id="loadButton" 
+                        class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded-md text-base transition-all"
+                        >Load from File</button>
+                    <button 
                         id="clearButton" 
                         class="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 py-2 px-6 rounded-md text-base transition-all"
                         >Clear Lyrics</button>
+                    <input type="file" id="fileInput" accept=".txt" class="hidden" />
                 </div>
             </div>
         </div>
@@ -79,11 +88,16 @@
         <!-- Slideshow view -->
         <div id="slideshowView" class="h-full flex flex-col hidden">
             <div class="slideshow-container bg-black text-white flex-grow flex flex-col justify-center items-center relative" id="slideshowContainer">
-                <div class="absolute top-4 left-4">
+                <div class="absolute top-4 left-4 flex space-x-2">
                     <button 
                         id="exitButton" 
                         class="bg-gray-800 hover:bg-gray-700 text-white py-1 px-3 rounded-md text-sm"
                         >Exit</button>
+                    <button 
+                        id="prevButton" 
+                        class="bg-gray-800 hover:bg-gray-700 text-white py-1 px-3 rounded-md text-sm"
+                        title="Go to previous slide"
+                        >&larr; Back</button>
                 </div>
                 
                 <div id="instructionText" class="text-center p-8 animate-fade-in">
@@ -92,11 +106,17 @@
                 </div>
                 
                 <div id="lyricsDisplay" class="text-center p-8 hidden">
-                    <!-- Current lyric -->
-                    <div id="currentLyric" class="text-4xl md:text-5xl lg:text-6xl font-bold mb-8 min-h-[4rem] animate-fade-in"></div>
+                    <!-- Current lyrics (2 lines) -->
+                    <div class="mb-8">
+                        <div id="currentLyric1" class="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 min-h-[3rem] animate-fade-in"></div>
+                        <div id="currentLyric2" class="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 min-h-[3rem] animate-fade-in"></div>
+                    </div>
                     
-                    <!-- Next lyric (blurred) -->
-                    <div id="nextLyric" class="text-2xl md:text-3xl blur-text min-h-[3rem] animate-fade-in"></div>
+                    <!-- Next lyrics (2 lines, less blurred) -->
+                    <div class="blur-text">
+                        <div id="nextLyric1" class="text-xl md:text-2xl mb-2 min-h-[2rem] animate-fade-in"></div>
+                        <div id="nextLyric2" class="text-xl md:text-2xl mb-2 min-h-[2rem] animate-fade-in"></div>
+                    </div>
                 </div>
                 
                 <div class="absolute bottom-4 w-full flex justify-between px-6">
@@ -131,8 +151,10 @@
         const slideshowContainer = document.getElementById('slideshowContainer');
         const instructionText = document.getElementById('instructionText');
         const lyricsDisplay = document.getElementById('lyricsDisplay');
-        const currentLyric = document.getElementById('currentLyric');
-        const nextLyric = document.getElementById('nextLyric');
+        const currentLyric1 = document.getElementById('currentLyric1');
+        const currentLyric2 = document.getElementById('currentLyric2');
+        const nextLyric1 = document.getElementById('nextLyric1');
+        const nextLyric2 = document.getElementById('nextLyric2');
         const slideInfo = document.getElementById('slideInfo');
         
         let lyrics = [];
@@ -143,6 +165,19 @@
         clearButton.addEventListener('click', clearLyrics);
         exitButton.addEventListener('click', exitSlideshow);
         slideshowContainer.addEventListener('click', advanceSlide);
+        
+        // Get the previous button and add its event listener
+        const prevButton = document.getElementById('prevButton');
+        prevButton.addEventListener('click', goToPreviousSlide);
+        
+        // Get file handling elements and add event listeners
+        const saveButton = document.getElementById('saveButton');
+        const loadButton = document.getElementById('loadButton');
+        const fileInput = document.getElementById('fileInput');
+        
+        saveButton.addEventListener('click', saveToFile);
+        loadButton.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', loadFromFile);
         
         // Try to load saved lyrics from localStorage if available
         try {
@@ -168,10 +203,22 @@
                 console.log('Could not save to localStorage:', e);
             }
             
-            // Split into lines and remove empty lines
+            // Split into lines and remove empty lines and section headers
             lyrics = text.split('\n')
                 .map(line => line.trim())
-                .filter(line => line.length > 0);
+                .filter(line => {
+                    if (line.length === 0) return false;
+                    
+                    // Skip lines that start with verse, chorus, or bridge (case-insensitive)
+                    const lowerLine = line.toLowerCase();
+                    if (lowerLine.startsWith('verse') || 
+                        lowerLine.startsWith('chorus') || 
+                        lowerLine.startsWith('bridge')) {
+                        return false;
+                    }
+                    
+                    return true;
+                });
             
             if (lyrics.length === 0) {
                 alert('Please enter valid lyrics with at least one line.');
@@ -197,8 +244,8 @@
                 return;
             }
             
-            // Advance to next slide
-            currentIndex++;
+            // Advance to next slide (by 2 lines)
+            currentIndex += 2;
             
             // If we've reached the end, go back to start
             if (currentIndex >= lyrics.length) {
@@ -209,20 +256,26 @@
         }
         
         function updateLyricDisplay() {
-            // Display current lyric
-            currentLyric.textContent = lyrics[currentIndex];
+            // Display current lyrics (2 lines)
+            currentLyric1.textContent = lyrics[currentIndex] || '';
+            currentLyric2.textContent = lyrics[currentIndex + 1] || '';
             
-            // Display next lyric (if available)
-            if (currentIndex + 1 < lyrics.length) {
-                nextLyric.textContent = lyrics[currentIndex + 1];
-                nextLyric.classList.remove('hidden');
-            } else {
-                // If at the last lyric, show the first one as next or clear
-                nextLyric.textContent = lyrics[0];
+            // Display next lyrics (2 lines, preview)
+            nextLyric1.textContent = lyrics[currentIndex + 2] || '';
+            nextLyric2.textContent = lyrics[currentIndex + 3] || '';
+            
+            // If we're near the end, wrap around for preview
+            if (currentIndex + 2 >= lyrics.length) {
+                nextLyric1.textContent = lyrics[(currentIndex + 2) % lyrics.length] || '';
+            }
+            if (currentIndex + 3 >= lyrics.length) {
+                nextLyric2.textContent = lyrics[(currentIndex + 3) % lyrics.length] || '';
             }
             
             // Update slide information
-            slideInfo.textContent = `Slide ${currentIndex + 1} of ${lyrics.length}`;
+            const totalSlides = Math.ceil(lyrics.length / 2);
+            const currentSlide = Math.floor(currentIndex / 2) + 1;
+            slideInfo.textContent = `Slide ${currentSlide} of ${totalSlides}`;
         }
         
         function clearLyrics() {
@@ -238,7 +291,96 @@
             slideshowView.classList.add('hidden');
             inputView.classList.remove('hidden');
         }
+        
+        function goToPreviousSlide(event) {
+            // Stop event propagation to prevent the main click handler from firing
+            event.stopPropagation();
+            
+            // If we're still showing the instruction text, do nothing
+            if (!instructionText.classList.contains('hidden')) {
+                return;
+            }
+            
+            // Go to the previous slide (by 2 lines)
+            currentIndex -= 2;
+            
+            // If we're before the first slide, loop to the end
+            if (currentIndex < 0) {
+                // Find the last valid 2-line starting position
+                const totalSlides = Math.ceil(lyrics.length / 2);
+                currentIndex = (totalSlides - 1) * 2;
+            }
+            
+            updateLyricDisplay();
+        }
+        
+        // Function to save the current lyrics to a text file
+        function saveToFile() {
+            const text = lyricsInput.value.trim();
+            if (!text) {
+                alert('Please enter some lyrics first before saving.');
+                return;
+            }
+            
+            // Create an invisible link element
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            
+            // Create a link to download the file
+            const a = document.createElement('a');
+            a.href = url;
+            
+            // Get song title from first non-empty line or use default
+            let firstLine = text.split('\n').find(line => line.trim().length > 0) || '';
+            // Clean up the title: remove section markers and limit length
+            firstLine = firstLine.replace(/^(verse|chorus|bridge)\s*\d*/i, '').trim();
+            const fileName = firstLine.slice(0, 30).trim() || 'worship-lyrics';
+            
+            a.download = `${fileName}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            
+            // Clean up
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            // Show success message
+            const originalText = saveButton.textContent;
+            saveButton.textContent = 'Saved!';
+            setTimeout(() => {
+                saveButton.textContent = originalText;
+            }, 1500);
+        }
+        
+        // Function to load lyrics from a text file
+        function loadFromFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                lyricsInput.value = e.target.result;
+                
+                // Save to localStorage
+                try {
+                    localStorage.setItem('worshipLyrics', e.target.result);
+                } catch (err) {
+                    console.log('Could not save to localStorage:', err);
+                }
+                
+                // Show success message
+                const originalText = loadButton.textContent;
+                loadButton.textContent = 'Loaded!';
+                setTimeout(() => {
+                    loadButton.textContent = originalText;
+                }, 1500);
+            };
+            
+            reader.readAsText(file);
+            
+            // Reset the file input so the same file can be loaded again
+            fileInput.value = '';
+        }
     </script>
 </body>
 </html>
-
