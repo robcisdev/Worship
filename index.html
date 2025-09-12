@@ -48,6 +48,11 @@
         .transition-all {
             transition: all 0.3s ease;
         }
+        
+        /* Simple, clean transitions */
+        .lyrics-line {
+            transition: opacity 0.3s ease;
+        }
     </style>
 </head>
 <body class="h-full m-0 font-sans bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
@@ -105,17 +110,17 @@
                     <p class="text-gray-400">Current slide is shown in full, next slide is blurred</p>
                 </div>
                 
-                <div id="lyricsDisplay" class="text-center p-8 hidden">
+                <div id="lyricsDisplay" class="text-center p-8 hidden overflow-hidden">
                     <!-- Current lyrics (2 lines) -->
-                    <div class="mb-8">
-                        <div id="currentLyric1" class="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 min-h-[3rem] animate-fade-in"></div>
-                        <div id="currentLyric2" class="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 min-h-[3rem] animate-fade-in"></div>
+                    <div class="mb-8 lyrics-container slide-in-active">
+                        <div id="currentLyric1" class="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 min-h-[3rem] lyrics-line"></div>
+                        <div id="currentLyric2" class="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 min-h-[3rem] lyrics-line"></div>
                     </div>
                     
                     <!-- Next lyrics (2 lines, less blurred) -->
-                    <div class="blur-text">
-                        <div id="nextLyric1" class="text-xl md:text-2xl mb-2 min-h-[2rem] animate-fade-in"></div>
-                        <div id="nextLyric2" class="text-xl md:text-2xl mb-2 min-h-[2rem] animate-fade-in"></div>
+                    <div class="blur-text lyrics-container slide-in-active">
+                        <div id="nextLyric1" class="text-xl md:text-2xl mb-2 min-h-[2rem] lyrics-line"></div>
+                        <div id="nextLyric2" class="text-xl md:text-2xl mb-2 min-h-[2rem] lyrics-line"></div>
                     </div>
                 </div>
                 
@@ -244,8 +249,8 @@
                 return;
             }
             
-            // Advance to next slide (by 1 line)
-            currentIndex++;
+            // Advance to next slide (by 2 lines for natural flow)
+            currentIndex += 2;
             
             // If we've reached the end, go back to start
             if (currentIndex >= lyrics.length) {
@@ -256,15 +261,13 @@
         }
         
         function updateLyricDisplay() {
-            // Display current lyrics (2 lines)
+            // Simple, immediate update - no animations
             currentLyric1.textContent = lyrics[currentIndex] || '';
             currentLyric2.textContent = lyrics[currentIndex + 1] || '';
-            
-            // Display next lyrics (2 lines, preview)
             nextLyric1.textContent = lyrics[currentIndex + 2] || '';
             nextLyric2.textContent = lyrics[currentIndex + 3] || '';
             
-            // If we're near the end, wrap around for preview
+            // Handle wrap-around for preview lines
             if (currentIndex + 2 >= lyrics.length) {
                 nextLyric1.textContent = lyrics[(currentIndex + 2) % lyrics.length] || '';
             }
@@ -272,10 +275,21 @@
                 nextLyric2.textContent = lyrics[(currentIndex + 3) % lyrics.length] || '';
             }
             
+            // Clean, clear styling
+            currentLyric1.style.filter = 'none';
+            currentLyric2.style.filter = 'none';
+            currentLyric1.style.opacity = '1';
+            currentLyric2.style.opacity = '1';
+            
+            nextLyric1.style.filter = 'blur(0.5px)';
+            nextLyric2.style.filter = 'blur(0.5px)';
+            nextLyric1.style.opacity = '0.7';
+            nextLyric2.style.opacity = '0.7';
+            
             // Update slide information
-            const totalSlides = Math.ceil(lyrics.length / 2);
-            const currentSlide = Math.floor(currentIndex / 2) + 1;
-            slideInfo.textContent = `Slide ${currentSlide} of ${totalSlides}`;
+            const totalSlides = lyrics.length;
+            const currentSlide = currentIndex + 1;
+            slideInfo.textContent = `Line ${currentSlide} of ${totalSlides}`;
         }
         
         function clearLyrics() {
@@ -301,12 +315,14 @@
                 return;
             }
             
-            // Go to the previous slide (by 1 line)
-            currentIndex--;
+            // Go to the previous slide (by 2 lines for natural flow)
+            currentIndex -= 2;
             
             // If we're before the first slide, loop to the end
             if (currentIndex < 0) {
-                currentIndex = lyrics.length - 1;
+                // Find the last valid 2-line starting position
+                const totalSlides = Math.ceil(lyrics.length / 2);
+                currentIndex = (totalSlides - 1) * 2;
             }
             
             updateLyricDisplay();
